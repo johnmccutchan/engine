@@ -988,6 +988,10 @@ void DlAiksCanvas::DrawImage(const sk_sp<flutter::DlImage>& image,
   const auto dest =
       SkRect::MakeXYWH(point.fX, point.fY, size.width, size.height);
 
+  FML_LOG(ERROR) << "DlAiksCanvas::DrawImage size=" << size
+                 << " src=" << src.width() << "x" << src.height()
+                 << " dst=" << dest.width() << "x" << dest.height();
+
   DrawImageRect(image,                      // image
                 src,                        // source rect
                 dest,                       // destination rect

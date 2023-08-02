@@ -30,6 +30,13 @@ class TextureGLES final : public Texture,
               TextureDescriptor desc,
               IsWrapped wrapped);
 
+  // Override the texture type and target used internally.
+  // NOTE: Implies IsWrapped.
+  TextureGLES(ReactorGLES::Ref reactor,
+              TextureDescriptor desc,
+              GLenum texture_type,
+              GLenum texture_target);
+
   // |Texture|
   ~TextureGLES() override;
 
@@ -57,6 +64,8 @@ class TextureGLES final : public Texture,
 
   ReactorGLES::Ref reactor_;
   const Type type_;
+  const GLenum texture_type_;
+  const std::optional<GLenum> texture_target_override_;
   HandleGLES handle_;
   mutable bool contents_initialized_ = false;
   const bool is_wrapped_;
@@ -64,7 +73,9 @@ class TextureGLES final : public Texture,
 
   TextureGLES(std::shared_ptr<ReactorGLES> reactor,
               TextureDescriptor desc,
-              bool is_wrapped);
+              bool is_wrapped,
+              std::optional<GLenum> texture_type_override = std::nullopt,
+              std::optional<GLenum> texture_target_override = std::nullopt);
 
   // |Texture|
   void SetLabel(std::string_view label) override;

@@ -28,6 +28,23 @@ static TextureGLES::Type GetTextureTypeFromDescriptor(
   return TextureGLES::Type::kTexture;
 }
 
+static GLenum GetTextureType(TextureType texture_type,
+                             std::optional<GLenum> texture_type_override) {
+  if (texture_type_override.has_value()) {
+    return texture_type_override.value();
+  }
+  return ToTextureType(texture_type);
+}
+
+static std::optional<GLenum> GetTextureTarget(
+    TextureType texture_type,
+    std::optional<GLenum> texture_target_override) {
+  if (texture_target_override.has_value()) {
+    return texture_target_override.value();
+  }
+  return ToTextureTarget(texture_type).value();
+}
+
 HandleType ToHandleType(TextureGLES::Type type) {
   switch (type) {
     case TextureGLES::Type::kTexture:
@@ -46,12 +63,27 @@ TextureGLES::TextureGLES(ReactorGLES::Ref reactor,
                          enum IsWrapped wrapped)
     : TextureGLES(std::move(reactor), desc, true) {}
 
+TextureGLES::TextureGLES(ReactorGLES::Ref reactor,
+                         TextureDescriptor desc,
+                         GLenum texture_type,
+                         GLenum texture_target)
+    : TextureGLES(std::move(reactor),
+                  desc,
+                  true,
+                  texture_type,
+                  texture_target) {}
+
 TextureGLES::TextureGLES(std::shared_ptr<ReactorGLES> reactor,
                          TextureDescriptor desc,
-                         bool is_wrapped)
+                         bool is_wrapped,
+                         std::optional<GLenum> texture_type_override,
+                         std::optional<GLenum> texture_target_override)
     : Texture(desc),
       reactor_(std::move(reactor)),
       type_(GetTextureTypeFromDescriptor(GetTextureDescriptor())),
+      texture_type_(
+          GetTextureType(GetTextureDescriptor().type, texture_type_override)),
+      texture_target_override_(texture_target_override),
       handle_(reactor_->CreateHandle(ToHandleType(type_))),
       is_wrapped_(is_wrapped) {
   // Ensure the texture descriptor itself is valid.
@@ -231,21 +263,23 @@ bool TextureGLES::OnSetContents(std::shared_ptr<const fml::Mapping> mapping,
     return false;
   }
 
-  GLenum texture_type;
+  GLenum texture_type = texture_type_;
   GLenum texture_target;
-  switch (tex_descriptor.type) {
-    case TextureType::kTexture2D:
-      texture_type = GL_TEXTURE_2D;
-      texture_target = GL_TEXTURE_2D;
-      break;
-    case TextureType::kTexture2DMultisample:
-      VALIDATION_LOG << "Multisample texture uploading is not supported for "
-                        "the OpenGLES backend.";
-      return false;
-    case TextureType::kTextureCube:
-      texture_type = GL_TEXTURE_CUBE_MAP;
-      texture_target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + slice;
-      break;
+  if (texture_target_override_.has_value()) {
+    texture_target = texture_target_override_.value();
+  } else {
+    switch (tex_descriptor.type) {
+      case TextureType::kTexture2D:
+        texture_target = GL_TEXTURE_2D;
+        break;
+      case TextureType::kTexture2DMultisample:
+        VALIDATION_LOG << "Multisample texture uploading is not supported for "
+                          "the OpenGLES backend.";
+        return false;
+      case TextureType::kTextureCube:
+        texture_target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + slice;
+        break;
+    }
   }
 
   auto data = std::make_shared<TexImage2DData>(tex_descriptor.format,
@@ -410,11 +444,14 @@ bool TextureGLES::Bind() const {
   const auto& gl = reactor_->GetProcTable();
   switch (type_) {
     case Type::kTexture: {
-      const auto target = ToTextureTarget(GetTextureDescriptor().type);
+      const auto target = GetTextureTarget(GetTextureDescriptor().type,
+                                           texture_target_override_);
       if (!target.has_value()) {
         VALIDATION_LOG << "Could not bind texture of this type.";
         return false;
       }
+      FML_LOG(ERROR) << "Binding TextureGLES id=" << handle.value()
+                     << " target = " << target.value();
       gl.BindTexture(target.value(), handle.value());
     } break;
     case Type::kRenderBuffer:
@@ -452,7 +489,7 @@ bool TextureGLES::GenerateMipmap() {
   }
 
   const auto& gl = reactor_->GetProcTable();
-  gl.GenerateMipmap(ToTextureType(type));
+  gl.GenerateMipmap(texture_type_);
   mipmap_generated_ = true;
   return true;
 }

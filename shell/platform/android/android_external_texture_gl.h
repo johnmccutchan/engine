@@ -8,7 +8,11 @@
 #include <GLES/gl.h>
 
 #include "flutter/common/graphics/texture.h"
+#include "flutter/impeller/renderer/backend/gles/context_gles.h"
+#include "flutter/impeller/renderer/backend/gles/handle_gles.h"
+#include "flutter/impeller/renderer/backend/gles/reactor_gles.h"
 #include "flutter/shell/platform/android/platform_view_android_jni_impl.h"
+#include "impeller/renderer/backend/gles/texture_gles.h"
 
 namespace flutter {
 
@@ -17,7 +21,8 @@ class AndroidExternalTextureGL : public flutter::Texture {
   AndroidExternalTextureGL(
       int64_t id,
       const fml::jni::ScopedJavaGlobalRef<jobject>& surface_texture,
-      std::shared_ptr<PlatformViewAndroidJNI> jni_facade);
+      std::shared_ptr<PlatformViewAndroidJNI> jni_facade,
+      const std::shared_ptr<impeller::ContextGLES>& impeller_context);
 
   ~AndroidExternalTextureGL() override;
 
@@ -35,9 +40,10 @@ class AndroidExternalTextureGL : public flutter::Texture {
   void OnTextureUnregistered() override;
 
  private:
+  void Inititialize(int width, int height);
   void Attach(jint textureName);
 
-  void Update();
+  void Update(PaintContext& context);
 
   void Detach();
 
@@ -46,16 +52,19 @@ class AndroidExternalTextureGL : public flutter::Texture {
   enum class AttachmentState { kUninitialized, kAttached, kDetached };
 
   std::shared_ptr<PlatformViewAndroidJNI> jni_facade_;
-
   fml::jni::ScopedJavaGlobalRef<jobject> surface_texture_;
+  std::shared_ptr<impeller::ContextGLES> impeller_context_;
 
   AttachmentState state_ = AttachmentState::kUninitialized;
 
   bool new_frame_ready_ = false;
+  SkMatrix transform_;
+  sk_sp<DlImage> external_image_;
 
+  // NOTE: Only populated when running under impeller.
+  std::shared_ptr<impeller::TextureGLES> texture_gles_;
+  // NOTE: Only populated when not running under impeller.
   GLuint texture_name_ = 0;
-
-  SkMatrix transform;
 
   FML_DISALLOW_COPY_AND_ASSIGN(AndroidExternalTextureGL);
 };

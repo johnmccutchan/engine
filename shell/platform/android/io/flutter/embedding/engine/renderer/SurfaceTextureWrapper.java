@@ -8,6 +8,7 @@ import android.graphics.SurfaceTexture;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import io.flutter.Log;
 
 /**
  * A wrapper for a SurfaceTexture that tracks whether the texture has been released.
@@ -53,6 +54,7 @@ public class SurfaceTextureWrapper {
     synchronized (this) {
       if (!released) {
         surfaceTexture.updateTexImage();
+        Log.e("SurfaceTextureWrapper", "Data space = " + surfaceTexture.getDataSpace());
         if (onFrameConsumed != null) {
           onFrameConsumed.run();
         }
